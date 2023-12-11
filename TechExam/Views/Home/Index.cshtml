@@ -1,0 +1,222 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+}
+
+<form>
+    <div class="row">
+        <label>Search Product ID: </label>
+        <input type="number" id="search_product_id" />
+        <button type="button" id="btn_search_product_id">Search Button</button>
+    </div>
+
+
+    <div class="row">
+        <label>Product ID: </label>
+        <input type="number" id="product_id" readonly />
+        <label>Cost: </label>
+        <input type="number" id="product_cost" readonly />
+    </div>
+    <div class="row">
+        <label>Product Name: </label>
+        <input type="text" id="product_name" readonly />
+        <label>Qty: </label>
+        <input type="number" id="product_qty"  />
+        <button type="button" id="btn_add_to_card">Add to cart</button>
+    </div>
+  
+</form>
+<div class="container">
+    <label>Orderered List</label>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Product Name</th>
+                <th scope="col">Cost</th>
+                <th scope="col">Qty</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Action</th>
+            </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+    </table>
+    <div class="d-flex flex-row-reverse">
+        <div class="row">
+            <label>Total Amount:</label>
+            <input type="number" id="total_amount" readonly />
+        </div>
+    </div>
+    <div class="d-flex flex-row-reverse">
+        <div class="row">
+            <label>Cash:</label>
+            <input type="number" id="cash_amount" />
+        </div>
+    </div>
+    <div class="d-flex flex-row-reverse">
+        <div class="row">
+            <label>Change:</label>
+            <input type="number" id="change_amount" readonly />
+        </div>
+    </div>
+    <div class="d-flex flex-row-reverse">
+        <div class="row">
+            <button id="btn_save_transaction" type="button">Save Transaction</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+    <script type="text/javascript">
+        $(document).ready(function () {
+            loadData();
+            function loadData() {
+                  $.ajax({
+                        type: "GET",
+                        url: "@Url.Action("ShowCarts")" ,
+                        dataType: "json",
+                        contentType: "application/json; charset=utf-8",
+                      success: function (data) {
+                        
+                          $('#total_amount').val(data['totalAmount'])
+                            data = JSON.parse(data['data']);
+                            let tr = "";
+                            for (var row in data) {
+                                let dataRow = data[row];
+                                tr += "<tr>"
+                                tr += "<td>" + dataRow['product_name'] + "</td>";
+                                tr += "<td>" + dataRow['product_cost'] + "</td>";
+                                tr += "<td>" + dataRow['product_qty'] + "</td>";
+                                tr += "<td>" + dataRow['product_amount'] + "</td>";
+                                tr += "<td><button id=" + dataRow['id']+" class='remove' >Remove</button></td>";
+                                tr += "</tr>";
+                            }
+                            $('#tbody').html("");
+                            $('#tbody').html(tr);
+                         
+                        },
+                        error: function () {
+                            alert("Error while selecting data");
+                        }
+                    });
+            }
+
+
+
+            $(document).on('click', '#btn_search_product_id', function () {
+                let id = $('#search_product_id').val();
+                if (id.length > 0) {
+                    $.ajax({
+                        type: "GET",
+                        url: "@Url.Action("ShowProduct")?Id="+id+"" ,
+                        dataType: "json",
+                        contentType: "application/json; charset=utf-8",
+                        success: function (data) {
+                            data = JSON.parse(data);
+                            data = data[0];
+                            console.log(data['name']);
+                            $('#product_id').val(data['id']);  
+                            $('#product_name').val(data['name']);  
+                            $('#product_cost').val(data['cost']);  
+                        },
+                        error: function () {
+                            alert("Error while selecting data");
+                        }
+                    });
+                }
+            });
+
+            $(document).on('click', '#btn_add_to_card', function () {
+                let id = $('#product_id').val();
+                let name = $('#product_name').val();
+                let cost = $('#product_cost').val();
+                let qty = $('#product_qty').val();
+
+                if (qty.length > 0) {
+                    $.ajax({
+                        type: "POST",
+                        url: "@Url.Action("SaveCart")" ,
+                        contentType: 'application/json',
+                        dataType: "json",
+                        data: JSON.stringify({
+                            product_id: id,
+                            cost: cost,
+                            qty: qty
+                        }),
+                        success: function () {
+                            loadData();
+                        },
+                        error: function () {
+                            alert("Error while selecting data");
+                        }
+                    });
+                }
+            });
+
+            $(document).on('click', '.remove', function () {
+                let id = $(this).attr('id');
+                if (id.length > 0) {
+                    $.ajax({
+                        type: "POST",
+                        url: "@Url.Action("DeleteCart")" ,
+                        contentType: 'application/json',
+                        dataType: "json",
+                        data: JSON.stringify({
+                            cart_id: id,
+                        }),
+                        success: function () {
+                            loadData();
+                        },
+                        error: function () {
+                            alert("Error while removing data");
+                        }
+                    });
+                }
+            }); 
+
+            $(document).on('change', '#cash_amount', function () {
+                let cash_amount = parseFloat($(this).val());
+                let total_amount = parseFloat($("#total_amount").val());
+                
+                if (cash_amount >= total_amount) {
+                    let change = total_amount - cash_amount;
+                    $('#change_amount').val(Math.abs(change));
+                }
+            });
+
+            $(document).on('click', '#btn_save_transaction', function () {
+                let change_amount = $('#change_amount').val();
+                let total_amount = $('#total_amount').val();
+                let cash_amount = $('#cash_amount').val();
+                let cart_ids = [];
+                $('#tbody tr').each(function (i, r) {
+                    cart_ids.push($(r).find('.remove').attr('id'));
+                });
+
+                if (cart_ids.length > 0) {
+                    $.ajax({
+                        type: "POST",
+                        url: "@Url.Action("SaveTransaction")" ,
+                        contentType: 'application/json',
+                        dataType: "json",
+                        data: JSON.stringify({
+                            change_amount,
+                            total_amount,
+                            cash_amount,
+                            cart_ids,
+                        }),
+                        success: function () {
+                            loadData();
+                            $('#cash_amount').val('');
+                            $('#change_amount').val('');
+                        },
+                        error: function () {
+                            alert("Error while removing data");
+                        }
+                    });
+                }
+
+            });
+        });
+    </script>
+    }
+
+
